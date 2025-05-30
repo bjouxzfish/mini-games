@@ -11,8 +11,10 @@ export const CATEGORIES: string[] = [
   'university_challenge'
 ];
 
-export const BASE_TRIVIA_URL: string = 'https://raw.githubusercontent.com/bjouxzfish/p5jsapp/gh-pages/assets/trivia/';
-
+export const BASE_TRIVIA_URL: string = process.env.NODE_ENV === 'production'
+  ? '/mini-games/trivia/' // For production on GitHub Pages
+  : '/mini-games/trivia/'; // For local development (Vite serves public from root)
+  
 export const DEFAULT_CATEGORY: string = 'geography';
 
 export const APP_TITLE: string = "TRIVIA CHALLENGE";
