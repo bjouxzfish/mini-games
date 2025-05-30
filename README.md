@@ -28,6 +28,11 @@ This guide contains everything you need to run your Trivia Challenge app locally
 
 This project is configured to deploy to GitHub Pages using the `gh-pages` package.
 
+0. **Install gh-pages**
+   ```bash
+   npm install gh-pages --save-dev
+   ```
+
 1.  **Deploy the app:**
     To build your app for production and deploy it to your GitHub Pages URL (`https://bjouxzfish.github.io/mini-games`), run:
     ```bash
