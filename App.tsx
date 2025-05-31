@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { TriviaQuestion } from './types';
 import { CATEGORIES, DEFAULT_CATEGORY, APP_TITLE, COLOR_BACKGROUND, COLOR_TEXT_PRIMARY, COLOR_ACCENT_SKY } from './constants';
@@ -18,6 +17,7 @@ const App: React.FC = () => {
   const [isLoadingInitialData, setIsLoadingInitialData] = useState<boolean>(true);
   const [isLoadingNextQuestion, setIsLoadingNextQuestion] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
 
   const loadInitialData = useCallback(async () => {
     setIsLoadingInitialData(true);
@@ -28,6 +28,26 @@ const App: React.FC = () => {
         setError("No trivia data could be loaded. Please check your connection or try again later.");
       } else {
         setAllQuestions(data);
+        // After loading initial data, set the default category and select a question
+        // This ensures a question is loaded immediately for the default category
+        const initialCategoryQuestions = data.get(DEFAULT_CATEGORY);
+        if (initialCategoryQuestions && initialCategoryQuestions.length > 0) {
+            const randomIndex = Math.floor(Math.random() * initialCategoryQuestions.length);
+            setCurrentQuestion(initialCategoryQuestions[randomIndex]);
+        } else if (data.size > 0) {
+            // Fallback: if default category has no questions, try the first available category
+            const firstCategory = Array.from(data.keys())[0];
+            const firstCategoryQuestions = data.get(firstCategory);
+            if (firstCategoryQuestions && firstCategoryQuestions.length > 0) {
+                const randomIndex = Math.floor(Math.random() * firstCategoryQuestions.length);
+                setCurrentQuestion(firstCategoryQuestions[randomIndex]);
+                setCurrentCategory(firstCategory); // Update current category if different
+            } else {
+                setError("No questions found in any category after initial load.");
+            }
+        } else {
+            setError("No trivia data could be loaded. Please check your connection or try again later.");
+        }
       }
     } catch (err) {
       console.error(err);
@@ -39,11 +59,12 @@ const App: React.FC = () => {
 
   useEffect(() => {
     loadInitialData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadInitialData]);
+
 
   const selectNewQuestion = useCallback((category: string) => {
     setIsLoadingNextQuestion(true);
+    setIsAnswerVisible(false); // Hide answer when new question is loaded
     const questionsInCategory = allQuestions.get(category);
     if (questionsInCategory && questionsInCategory.length > 0) {
       const randomIndex = Math.floor(Math.random() * questionsInCategory.length);
@@ -51,26 +72,28 @@ const App: React.FC = () => {
       setError(null);
     } else {
       setCurrentQuestion(null);
-      if (allQuestions.size > 0) { // Only show error if categories are loaded but this one is empty
+      if (allQuestions.size > 0) {
          setError(`No questions found for category: ${category}. Try another one.`);
+      } else {
+          // This case should ideally be handled by isLoadingInitialData / initial error
+          setError("No trivia data loaded yet.");
       }
     }
-    setIsAnswerVisible(false);
     setIsLoadingNextQuestion(false);
   }, [allQuestions]);
 
+  // This useEffect will now *only* trigger when currentCategory changes
+  // and will ensure a new question for that category is selected.
   useEffect(() => {
-    if (!isLoadingInitialData && allQuestions.size > 0) {
-      if (!currentQuestion || currentQuestion.category_id !== currentCategory.toLowerCase().replace(/ /g, '_')) {
-         selectNewQuestion(currentCategory);
-      }
+    if (!isLoadingInitialData && allQuestions.size > 0 && currentCategory) {
+      selectNewQuestion(currentCategory);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allQuestions, isLoadingInitialData, currentCategory, selectNewQuestion]); // currentQuestion removed to prevent re-triggering on nextQuestion for same category. selectNewQuestion dependency implies allQuestions.
+  }, [currentCategory, allQuestions, isLoadingInitialData, selectNewQuestion]);
+
 
   const handleSelectCategory = useCallback((category: string) => {
     setCurrentCategory(category);
-    // selectNewQuestion will be called by the useEffect above when currentCategory changes
+    setIsAnswerVisible(false); // Hide answer immediately on category change
   }, []);
 
   const handleNextQuestion = useCallback(() => {
@@ -80,6 +103,10 @@ const App: React.FC = () => {
   const handleToggleAnswer = () => {
     setIsAnswerVisible(prev => !prev);
   };
+
+  const handleToggleSidebar = useCallback(() => {
+    setIsSidebarOpen(prev => !prev);
+  }, []);
 
   const questionsInCurrentCat = allQuestions.get(currentCategory);
   const numQuestionsInCurrentCategory = questionsInCurrentCat ? questionsInCurrentCat.length : 0;
@@ -95,10 +122,12 @@ const App: React.FC = () => {
 
   return (
     <div className={`flex h-screen ${COLOR_BACKGROUND} ${COLOR_TEXT_PRIMARY} overflow-hidden`}>
-      <CategorySidebar 
-        activeCategory={currentCategory} 
+      <CategorySidebar
+        activeCategory={currentCategory}
         onSelectCategory={handleSelectCategory}
         isLoading={isLoadingInitialData || isLoadingNextQuestion}
+        isOpen={isSidebarOpen}
+        onToggleSidebar={handleToggleSidebar}
       />
       <main className="flex-1 flex flex-col p-4 md:p-8 space-y-6 overflow-y-auto">
         <header className="text-center">
@@ -118,7 +147,7 @@ const App: React.FC = () => {
         {!error && allQuestions.size === 0 && !isLoadingInitialData && (
           <ErrorMessage title="No Data" message="Could not load any trivia questions. The source might be unavailable." />
         )}
-        
+
         {(allQuestions.size > 0 || currentQuestion) && (
           <>
             <QuestionDisplay questionText={currentQuestion?.question || null} isLoading={isLoadingNextQuestion} />
